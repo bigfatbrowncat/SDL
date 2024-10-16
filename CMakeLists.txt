@@ -1133,6 +1133,7 @@ sdl_glob_sources(
   "${SDL3_SOURCE_DIR}/src/power/*.c"
   "${SDL3_SOURCE_DIR}/src/render/*.c"
   "${SDL3_SOURCE_DIR}/src/render/*/*.c"
+  "${SDL3_SOURCE_DIR}/src/render/*/*.cpp"
   "${SDL3_SOURCE_DIR}/src/sensor/*.c"
   "${SDL3_SOURCE_DIR}/src/stdlib/*.c"
   "${SDL3_SOURCE_DIR}/src/storage/*.c"

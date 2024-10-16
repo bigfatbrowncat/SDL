@@ -702,6 +702,8 @@ bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properties
         style |= GetWindowStyle(window);
         styleEx |= GetWindowStyleEx(window);
 
+		styleEx |= /*WS_EX_NOREDIRECTIONBITMAP |*/ WS_EX_COMPOSITED;
+
         // Figure out what the window area will be
         WIN_ConstrainPopup(window);
         WIN_AdjustWindowRectWithStyle(window, style, styleEx, FALSE, &x, &y, &w, &h, SDL_WINDOWRECT_FLOATING);
@@ -995,7 +997,10 @@ void WIN_GetWindowSizeInPixels(SDL_VideoDevice *_this, SDL_Window *window, int *
     HWND hwnd = data->hwnd;
     RECT rect;
 
-    if (GetClientRect(hwnd, &rect) && !WIN_IsRectEmpty(&rect)) {
+	if (window->is_resizing) {
+		*w = window->resizing_w;
+		*h = window->resizing_h;
+	} else if (GetClientRect(hwnd, &rect) && !WIN_IsRectEmpty(&rect)) {
         *w = rect.right;
         *h = rect.bottom;
     } else if (window->last_pixel_w && window->last_pixel_h) {

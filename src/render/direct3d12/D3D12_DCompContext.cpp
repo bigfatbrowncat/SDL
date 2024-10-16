@@ -1,4 +1,4 @@
-#include "DCompContext.h"
+#include "D3D12_DCompContext.h"
 
 // OS headers
 #include <dcomp.h>

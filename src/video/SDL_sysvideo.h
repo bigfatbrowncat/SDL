@@ -54,6 +54,8 @@ struct SDL_Window
     float min_aspect;
     float max_aspect;
     int last_pixel_w, last_pixel_h;
+	bool is_resizing;
+	int resizing_w, resizing_h;
     SDL_WindowFlags flags;
     SDL_WindowFlags pending_flags;
     float display_scale;

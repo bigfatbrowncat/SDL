@@ -1034,6 +1034,8 @@ static bool SkipAltGrLeftControl(WPARAM wParam, LPARAM lParam)
     return false;
 }
 
+void UpdateRendererSize(SDL_Renderer *renderer);
+
 LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     SDL_WindowData *data;
@@ -1461,7 +1463,7 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             windowpos->flags &= ~(SWP_NOSIZE | SWP_NOMOVE);
 
             data->floating_rect_pending = false;
-        }
+		}
     } break;
 
     case WM_WINDOWPOSCHANGED:
@@ -1568,6 +1570,7 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_EXITSIZEMOVE:
     case WM_EXITMENULOOP:
     {
+		data->window->is_resizing = false;
         KillTimer(hwnd, (UINT_PTR)SDL_IterateMainCallbacks);
     } break;
 
@@ -1897,8 +1900,27 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                 params->rgrc[0].right = params->rgrc[0].left + w;
                 params->rgrc[0].bottom = params->rgrc[0].top + h;
             }
-            return 0;
+            //return 0;
         }
+
+		// Use the result of DefWindowProc's WM_NCCALCSIZE handler to get the upcoming client rect.
+		// Technically, when wparam is TRUE, lparam points to NCCALCSIZE_PARAMS, but its first
+		// member is a RECT with the same meaning as the one lparam points to when wparam is FALSE.
+		DefWindowProc(hwnd, msg, wParam, lParam);
+		RECT *rect = (RECT *) lParam;
+		if (rect->right > rect->left && rect->bottom > rect->top) {
+			/*data->width*/ data->window->resizing_w = rect->right - rect->left;
+			/*data->height*/ data->window->resizing_h = rect->bottom - rect->top;
+			data->window->is_resizing = true;
+
+			SDL_Renderer* renderer = SDL_GetRenderer(data->window);
+			if (renderer != NULL) {
+				UpdateRendererSize(renderer);
+			}
+			SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, data->window->resizing_w, data->window->resizing_h);
+		}
+		// We're never preserving the client area, so we always return 0.
+		return 0;
     } break;
 
     case WM_NCHITTEST:

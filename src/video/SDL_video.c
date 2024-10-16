@@ -3019,7 +3019,11 @@ bool SDL_GetWindowSizeInPixels(SDL_Window *window, int *w, int *h)
         h = &filter;
     }
 
-    if (_this->GetWindowSizeInPixels) {
+	if (window->is_resizing) {
+		*w = window->resizing_w;
+		*h = window->resizing_h;
+		return true;
+	} else if (_this->GetWindowSizeInPixels) {
         _this->GetWindowSizeInPixels(_this, window, w, h);
     } else {
         SDL_DisplayID displayID = SDL_GetDisplayForWindow(window);

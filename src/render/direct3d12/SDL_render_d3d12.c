@@ -33,6 +33,9 @@
 #include "../SDL_d3dmath.h"
 #include "../../video/directx/SDL_d3d12.h"
 
+#include "D3D12_DCompContext.h"
+#include <dxgi1_2.h>
+
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
 #include "SDL_render_d3d12_xbox.h"
 #endif
@@ -254,6 +257,9 @@ typedef struct
     Float4X4 identity;
     int currentVertexBuffer;
     bool issueBatch;
+
+	IDXGIAdapter* intelAdapter;
+	IDXGIOutput* intelAdapterFirstOutput;
 } D3D12_RenderData;
 
 // Define D3D GUIDs here so we don't have to include uuid.lib.
@@ -1242,14 +1248,17 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = 2; // Use double-buffering to minimize latency.
-    if (WIN_IsWindows8OrGreater()) {
-        swapChainDesc.Scaling = DXGI_SCALING_NONE;
-    } else {
-        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
-    }
+	if (false) {	// DXGI_SCALING_NONE doesn't work with DirectComposition for some reason
+		if (WIN_IsWindows8OrGreater()) {
+			swapChainDesc.Scaling = DXGI_SCALING_NONE;
+		} else {
+			swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+		}
+	}
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;               // All Windows Store apps must use this SwapEffect.
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | // To support SetMaximumFrameLatency
-                          DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;                  // To support presenting with allow tearing on
+	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+    swapChainDesc.Flags = 0;//DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | // To support SetMaximumFrameLatency
+                          //DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;                  // To support presenting with allow tearing on
 
     HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(renderer->window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
     if (!hwnd) {
@@ -1258,15 +1267,25 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
     }
 
-    result = IDXGIFactory2_CreateSwapChainForHwnd(data->dxgiFactory,
+    result = IDXGIFactory2_CreateSwapChainForComposition(data->dxgiFactory,
                       (IUnknown *)data->commandQueue,
-                      hwnd,
-                      &swapChainDesc,
-                      NULL,
+                      //hwnd,
+					  &swapChainDesc, //&scd,
+                      //NULL,
                       NULL, // Allow on all displays.
                       &swapChain);
-    if (FAILED(result)) {
-        WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForHwnd"), result);
+
+//	result = DCompositionCreateDevice(NULL, __uuidof(IDCompositionDevice), &data->dcomp));
+//	IDCompositionTarget *target;
+//	result = data->dcomp->lpVtbl->CreateTargetForHwnd(data->dcomp, hwnd, FALSE, &target);
+//	IDCompositionVisual *visual;
+//	result = data->dcomp->lpVtbl->CreateVisual(data->dcomp, &visual);
+//	result = target->lpVtbl->SetRoot(target, visual);
+//	result = visual->lpVtbl->SetContent(visual, (IUnknown *)swapChain);
+//	result = data->dcomp->lpVtbl->Commit(data->dcomp);
+
+	if (FAILED(result)) {
+        WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForComposition"), result);
         goto done;
     }
 
@@ -1278,17 +1297,19 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
     }
 
-    /* Ensure that the swapchain does not queue more than one frame at a time. This both reduces latency
-     * and ensures that the application will only render after each VSync, minimizing power consumption.
-     */
-    result = IDXGISwapChain4_SetMaximumFrameLatency(data->swapChain, 1);
-    if (FAILED(result)) {
-        WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGISwapChain4::SetMaximumFrameLatency"), result);
-        goto done;
-    }
+	void* dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
 
-    data->swapEffect = swapChainDesc.SwapEffect;
-    data->swapFlags = swapChainDesc.Flags;
+	/* Ensure that the swapchain does not queue more than one frame at a time. This both reduces latency
+	 * and ensures that the application will only render after each VSync, minimizing power consumption.
+	 */
+//    result = IDXGISwapChain4_SetMaximumFrameLatency(data->swapChain, 1);
+//    if (FAILED(result)) {
+//        WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGISwapChain4::SetMaximumFrameLatency"), result);
+//        goto done;
+//    }
+
+    data->swapEffect = swapChainDesc.SwapEffect; // swapChainDesc.SwapEffect;
+    data->swapFlags = swapChainDesc.Flags; //  swapChainDesc.Flags;
 
     UINT colorspace_support = 0;
     DXGI_COLOR_SPACE_TYPE colorspace;
@@ -1325,7 +1346,7 @@ done:
 }
 #endif
 
-static HRESULT D3D12_UpdateForWindowSizeChange(SDL_Renderer *renderer);
+HRESULT D3D12_UpdateForWindowSizeChange(SDL_Renderer *renderer);
 
 HRESULT
 D3D12_HandleDeviceLost(SDL_Renderer *renderer)
@@ -1357,9 +1378,90 @@ D3D12_HandleDeviceLost(SDL_Renderer *renderer)
     return S_OK;
 }
 
+static bool D3D12_LookForIntelOutput(SDL_Renderer *renderer) {
+	D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
+
+	D3D_SAFE_RELEASE(data->intelAdapterFirstOutput);
+//	if (data->intelAdapterFirstOutput != NULL) {
+//		data->intelAdapterFirstOutput->Release();
+//		data->intelAdapterFirstOutput = NULL;
+//	}
+	if (data->intelAdapter == NULL) {
+//		typedef HRESULT(WINAPI * PFN_CREATE_DXGI_FACTORY)(UINT flags, REFIID riid, void **ppFactory);
+//		PFN_CREATE_DXGI_FACTORY CreateDXGIFactoryFunc;
+//
+//		CreateDXGIFactoryFunc = (PFN_CREATE_DXGI_FACTORY)SDL_LoadFunction(data->hDXGIMod, "CreateDXGIFactory2");
+//		if (!CreateDXGIFactoryFunc) {
+//			return false; //E_FAIL;
+//		}
+//
+//		HRESULT result = CreateDXGIFactoryFunc(0, D3D_GUID(SDL_IID_IDXGIFactory6), (void **)&data->dxgiFactory);
+//		if (FAILED(result)) {
+//			HRESULT result;
+//			WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("CreateDXGIFactory"), result);
+//			return false;
+//		}
+
+		const UINT INTEL_VENDOR_ID = 0x8086;
+		IDXGIAdapter* adapter;
+		for (UINT i = 0; data->dxgiFactory->lpVtbl->EnumAdapters(data->dxgiFactory, i, &adapter) != DXGI_ERROR_NOT_FOUND; i++) {
+			DXGI_ADAPTER_DESC desc;
+			//adapters.push_back(adapter);
+
+			HRESULT res = adapter->lpVtbl->GetDesc(adapter, &desc);
+			if (res != S_OK) return res;
+
+			if (desc.VendorId == INTEL_VENDOR_ID) {
+					data->intelAdapter = adapter;
+					break;
+				}
+		}
+
+		}
+
+
+	if (data->intelAdapter != NULL) {
+		IDXGIOutput* output;
+		for (UINT i = 0; data->intelAdapter->lpVtbl->EnumOutputs(data->intelAdapter, i, &output) != DXGI_ERROR_NOT_FOUND; i++) {
+			DXGI_OUTPUT_DESC outputDesc;
+			HRESULT result = output->lpVtbl->GetDesc(output, &outputDesc);
+			if (FAILED(result)) {
+				return WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("ID3D12Device::D3D12_LookForIntelOutput"), result);
+			}
+
+			if (outputDesc.Monitor != NULL /*&&
+							outputDesc.DesktopCoordinates.left <= position.right &&
+							outputDesc.DesktopCoordinates.top <= position.bottom &&
+							outputDesc.DesktopCoordinates.right >= position.right &&
+							outputDesc.DesktopCoordinates.bottom >= position.bottom*/) {
+
+				data->intelAdapterFirstOutput = output;
+				break;
+			} else {
+				output->lpVtbl->Release(output);
+			}
+		}
+	}
+	return true;
+}
+
+static bool D3D12_SyncIntelOutput(SDL_Renderer *renderer) {
+	D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
+
+	if (data->intelAdapterFirstOutput != NULL) {
+		HRESULT result = data->intelAdapterFirstOutput->lpVtbl->WaitForVBlank(data->intelAdapterFirstOutput);
+		if (FAILED(result)) {
+			return WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("ID3D12Device::D3D12_SyncIntelOutput"), result);
+		}
+	}
+	return true;
+}
+
 // Initialize all resources that change when the window's size changes.
 static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 {
+	D3D12_LookForIntelOutput(renderer);
+
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
     HRESULT result = S_OK;
     int i, w, h;
@@ -1380,6 +1482,14 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
      * non-rotated size.
      */
     SDL_GetWindowSizeInPixels(renderer->window, &w, &h);
+//	SDL_WindowData* winData = renderer->window->internal;
+//	if (renderer->window->is_resizing) {
+//		w = renderer->window->resizing_w;
+//		h = renderer->window->resizing_h;
+//	}
+//	w = winData->width;
+//	h = winData->height;
+
     data->rotation = D3D12_GetCurrentRotation();
     if (D3D12_IsDisplayRotated90Degrees(data->rotation)) {
         int tmp = w;
@@ -1389,10 +1499,11 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 
 #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (data->swapChain) {
+		printf("rb w: %d, h: %d\n", w, h); fflush(stdout);
         // If the swap chain already exists, resize it.
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                           0,
-                          w, h,
+                          w * 1.5, h * 1.5,
                           DXGI_FORMAT_UNKNOWN,
                           data->swapFlags);
         if (result == DXGI_ERROR_DEVICE_REMOVED) {
@@ -1484,7 +1595,7 @@ done:
 }
 
 // This method is called when the window's size changes.
-static HRESULT D3D12_UpdateForWindowSizeChange(SDL_Renderer *renderer)
+HRESULT D3D12_UpdateForWindowSizeChange(SDL_Renderer *renderer)
 {
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
     // If the GPU has previous work, wait for it to be done first
@@ -2820,15 +2931,21 @@ static void D3D12_InvalidateCachedState(SDL_Renderer *renderer)
     data->viewportDirty = true;
 }
 
+static void D3D12_UpdateSize(SDL_Renderer *renderer)
+{
+	D3D12_RenderData *rendererData = (D3D12_RenderData *)renderer->internal;
+	if (rendererData->pixelSizeChanged) {
+		D3D12_UpdateForWindowSizeChange(renderer);
+		rendererData->pixelSizeChanged = false;
+	}
+}
+
 static bool D3D12_RunCommandQueue(SDL_Renderer *renderer, SDL_RenderCommand *cmd, void *vertices, size_t vertsize)
 {
     D3D12_RenderData *rendererData = (D3D12_RenderData *)renderer->internal;
     const int viewportRotation = D3D12_GetRotationForCurrentRenderTarget(renderer);
 
-    if (rendererData->pixelSizeChanged) {
-        D3D12_UpdateForWindowSizeChange(renderer);
-        rendererData->pixelSizeChanged = false;
-    }
+	D3D12_UpdateSize(renderer);
 
     if (rendererData->currentViewportRotation != viewportRotation) {
         rendererData->currentViewportRotation = viewportRotation;
@@ -3103,7 +3220,7 @@ done:
     return output;
 }
 
-static bool D3D12_RenderPresent(SDL_Renderer *renderer)
+bool D3D12_RenderPresent(SDL_Renderer *renderer)
 {
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
     HRESULT result;
@@ -3118,6 +3235,10 @@ static bool D3D12_RenderPresent(SDL_Renderer *renderer)
     result = ID3D12GraphicsCommandList2_Close(data->commandList);
     ID3D12CommandQueue_ExecuteCommandLists(data->commandQueue, 1, (ID3D12CommandList *const *)&data->commandList);
 
+	D3D12_SyncIntelOutput(renderer);
+
+	//result = IDXGISwapChain_Present(data->swapChain, 0, DXGI_PRESENT_RESTART);
+
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
     result = D3D12_XBOX_PresentFrame(data->commandQueue, data->frameToken, data->renderTargets[data->currentBackBufferIndex]);
 #else
@@ -3125,6 +3246,7 @@ static bool D3D12_RenderPresent(SDL_Renderer *renderer)
      * rects to improve efficiency in certain scenarios.
      */
     result = IDXGISwapChain_Present(data->swapChain, data->syncInterval, data->presentFlags);
+	//result = IDXGISwapChain_Present(data->swapChain, 1, DXGI_PRESENT_DO_NOT_SEQUENCE);
 #endif
 
     if (FAILED(result) && result != DXGI_ERROR_WAS_STILL_DRAWING) {
@@ -3238,6 +3360,7 @@ bool D3D12_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Proper
     renderer->QueueDrawLines = D3D12_QueueDrawPoints; // lines and points queue vertices the same way.
     renderer->QueueGeometry = D3D12_QueueGeometry;
     renderer->InvalidateCachedState = D3D12_InvalidateCachedState;
+	renderer->UpdateSize = D3D12_UpdateSize;
     renderer->RunCommandQueue = D3D12_RunCommandQueue;
     renderer->RenderReadPixels = D3D12_RenderReadPixels;
     renderer->RenderPresent = D3D12_RenderPresent;

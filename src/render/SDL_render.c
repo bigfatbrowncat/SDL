@@ -306,6 +306,13 @@ static SDL_INLINE void DebugLogRenderCommands(const SDL_RenderCommand *cmd)
 #endif
 }
 
+void UpdateRendererSize(SDL_Renderer *renderer)
+{
+	if (renderer->UpdateSize) {
+		renderer->UpdateSize(renderer);
+	}
+}
+
 static bool FlushRenderCommands(SDL_Renderer *renderer)
 {
     bool result;
