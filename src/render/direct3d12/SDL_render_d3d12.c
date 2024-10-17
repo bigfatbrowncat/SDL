@@ -1508,7 +1508,7 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
         // If the swap chain already exists, resize it.
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                           0,
-                          w * 1.5, h * 1.5,
+						  (UINT)(w * 1.5), (UINT)(h * 1.5),
                           DXGI_FORMAT_UNKNOWN,
                           data->swapFlags);
         if (result == DXGI_ERROR_DEVICE_REMOVED) {
