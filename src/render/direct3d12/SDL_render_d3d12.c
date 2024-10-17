@@ -33,7 +33,7 @@
 #include "../SDL_d3dmath.h"
 #include "../../video/directx/SDL_d3d12.h"
 
-#include "D3D12_DCompContext.h"
+#include "SDL_render_d3d12_dcompcontext.h"
 #include <dxgi1_2.h>
 
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)

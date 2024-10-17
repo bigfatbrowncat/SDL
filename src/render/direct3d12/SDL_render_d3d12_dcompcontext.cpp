@@ -1,4 +1,4 @@
-#include "D3D12_DCompContext.h"
+#include "SDL_render_d3d12_dcompcontext.h"
 
 #ifdef SDL_VIDEO_RENDER_D3D12
 
@@ -13,9 +13,6 @@ struct DCompContext {
 	IDCompositionDevice* dcomp;
 	IDCompositionTarget* target;
 	IDCompositionVisual* visual;
-
-	// This function should NOT be called from the destructor, instead it has to be called in WM_DESTROY
-	void unbind();
 
 	// Call this function immediately after the CreateWindowEx(WS_EX_NOREDIRECTIONBITMAP, ...)
 	DCompContext(HWND hwnd, IDXGISwapChain3* swapChain);
