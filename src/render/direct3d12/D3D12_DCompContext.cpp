@@ -30,9 +30,10 @@ struct DCompContext {
 		while (true) __debugbreak();
 	}
 
+	virtual ~DCompContext();
 };
 
-void DCompContext::unbind() {
+DCompContext::~DCompContext() {
     if (visual != nullptr) { visual->Release(); visual = nullptr; }
     if (target != nullptr) { target->Release(); target = nullptr; }
     if (dcomp != nullptr) { dcomp->Release(); dcomp = nullptr; }
@@ -51,8 +52,14 @@ DCompContext::DCompContext(HWND hwnd, IDXGISwapChain3* swapChain): dcomp(nullptr
 	hr_check(dcomp->Commit());
 }
 
-extern "C" void* CreateDCompContextFor(HWND hwnd, IDXGISwapChain3* swapChain) {
-	return (void*)(new DCompContext(hwnd, swapChain));
+extern "C" {
+	void* CreateDCompContextFor(HWND hwnd, IDXGISwapChain3* swapChain) {
+		return reinterpret_cast<void*>(new DCompContext(hwnd, swapChain));
+	}
+
+	void DestroyDCompContext(void* context) {
+		delete reinterpret_cast<DCompContext*>(context);
+	}
 }
 
 #endif // SDL_VIDEO_RENDER_D3D12

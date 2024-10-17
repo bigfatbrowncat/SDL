@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 void *CreateDCompContextFor(HWND hwnd, IDXGISwapChain3 *swapChain);
+void DestroyDCompContext(void* context);
 
 #ifdef __cplusplus
 }

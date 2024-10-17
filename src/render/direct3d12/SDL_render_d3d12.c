@@ -260,6 +260,7 @@ typedef struct
 
 	IDXGIAdapter* intelAdapter;
 	IDXGIOutput* intelAdapterFirstOutput;
+	void* dcompContext;
 } D3D12_RenderData;
 
 // Define D3D GUIDs here so we don't have to include uuid.lib.
@@ -399,6 +400,10 @@ static void D3D12_ReleaseAll(SDL_Renderer *renderer)
         D3D_SAFE_RELEASE(data->dxgiFactory);
         D3D_SAFE_RELEASE(data->dxgiAdapter);
         D3D_SAFE_RELEASE(data->swapChain);
+		DestroyDCompContext(data->dcompContext);
+
+		D3D_SAFE_RELEASE(data->intelAdapterFirstOutput);
+		D3D_SAFE_RELEASE(data->intelAdapter);
 #endif
         D3D_SAFE_RELEASE(data->d3dDevice);
         D3D_SAFE_RELEASE(data->debugInterface);
@@ -1297,7 +1302,7 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
     }
 
-	void* dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
+	data->dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
 
 	/* Ensure that the swapchain does not queue more than one frame at a time. This both reduces latency
 	 * and ensures that the application will only render after each VSync, minimizing power consumption.
