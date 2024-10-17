@@ -8,8 +8,10 @@
 extern "C" {
 #endif
 
-void *CreateDCompContextFor(HWND hwnd, IDXGISwapChain3 *swapChain);
-void DestroyDCompContext(void* context);
+typedef struct DCompContext DCompContext;
+
+DCompContext *CreateDCompContextFor(HWND hwnd, IDXGISwapChain3 *swapChain);
+void DestroyDCompContext(DCompContext* context);
 
 #ifdef __cplusplus
 }

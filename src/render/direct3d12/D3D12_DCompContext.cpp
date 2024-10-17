@@ -53,12 +53,12 @@ DCompContext::DCompContext(HWND hwnd, IDXGISwapChain3* swapChain): dcomp(nullptr
 }
 
 extern "C" {
-	void* CreateDCompContextFor(HWND hwnd, IDXGISwapChain3* swapChain) {
-		return reinterpret_cast<void*>(new DCompContext(hwnd, swapChain));
+	DCompContext* CreateDCompContextFor(HWND hwnd, IDXGISwapChain3* swapChain) {
+		return new DCompContext(hwnd, swapChain);
 	}
 
-	void DestroyDCompContext(void* context) {
-		delete reinterpret_cast<DCompContext*>(context);
+	void DestroyDCompContext(DCompContext* context) {
+		delete context;
 	}
 }
 
