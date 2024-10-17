@@ -1,5 +1,7 @@
 #include "D3D12_DCompContext.h"
 
+#ifdef SDL_VIDEO_RENDER_D3D12
+
 // OS headers
 #include <dcomp.h>
 #include <Windows.h>
@@ -52,3 +54,5 @@ DCompContext::DCompContext(HWND hwnd, IDXGISwapChain3* swapChain): dcomp(nullptr
 extern "C" void* CreateDCompContextFor(HWND hwnd, IDXGISwapChain3* swapChain) {
 	return (void*)(new DCompContext(hwnd, swapChain));
 }
+
+#endif // SDL_VIDEO_RENDER_D3D12
