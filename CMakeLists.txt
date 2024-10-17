@@ -1133,7 +1133,6 @@ sdl_glob_sources(
   "${SDL3_SOURCE_DIR}/src/power/*.c"
   "${SDL3_SOURCE_DIR}/src/render/*.c"
   "${SDL3_SOURCE_DIR}/src/render/*/*.c"
-  "${SDL3_SOURCE_DIR}/src/render/*/*.cpp"
   "${SDL3_SOURCE_DIR}/src/sensor/*.c"
   "${SDL3_SOURCE_DIR}/src/stdlib/*.c"
   "${SDL3_SOURCE_DIR}/src/storage/*.c"
@@ -2939,6 +2938,8 @@ if(SDL_GPU)
   endif()
   if(SDL_RENDER_D3D12)
     sdl_glob_sources("${SDL3_SOURCE_DIR}/src/gpu/d3d12/*.c")
+    sdl_sources("${SDL3_SOURCE_DIR}/src/render/direct3d12/SDL_render_d3d12_dcompcontext.cpp")
+    sdl_link_dependency(dcomp LIBS dcomp)
     set(SDL_GPU_D3D12 1)
     set(HAVE_SDL_GPU TRUE)
   endif()
