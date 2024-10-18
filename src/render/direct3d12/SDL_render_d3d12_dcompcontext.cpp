@@ -20,7 +20,7 @@
 */
 #include "SDL_internal.h"
 
-#ifdef SDL_VIDEO_RENDER_D3D12
+#if defined(SDL_VIDEO_RENDER_D3D12) && defined(SDL_VIDEO_DCOMP)
 
 #include "SDL_render_d3d12_dcompcontext.h"
 
@@ -81,4 +81,4 @@ extern "C" {
 	}
 }
 
-#endif // SDL_VIDEO_RENDER_D3D12
+#endif // defined(SDL_VIDEO_RENDER_D3D12) and defined(SDL_DCOMP)
