@@ -3365,7 +3365,7 @@ if(SDL_SHARED)
   )
   target_link_libraries(SDL3-shared PUBLIC $<TARGET_NAME:SDL3::Headers>)
   if(MINGW OR CYGWIN)
-    target_link_options(SDL3-shared PRIVATE -static-libgcc)
+    target_link_options(SDL3-shared PRIVATE -static-libgcc -static-libstdc++)
   endif()
   # Use `Compatible Interface Properties` to:
   # - allow consumers to enforce a shared/static library
