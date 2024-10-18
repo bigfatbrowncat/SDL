@@ -768,7 +768,10 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.Scarlett.x64'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">CompileAsCpp</CompileAs>
     </ClCompile>
-    <ClCompile Include="..\..\src\render\direct3d12\SDL_render_d3d12_dcompcontext.cpp" />
+    <ClCompile Include="..\..\src\render\direct3d12\SDL_render_d3d12_dcompcontext.cpp">
+      <PrecompiledHeaderOutputFile Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Desktop.x64'">$(IntDir)$(TargetName)_cpp.pch</PrecompiledHeaderOutputFile>
+      <PrecompiledHeaderOutputFile Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Desktop.x64'">$(IntDir)$(TargetName)_cpp.pch</PrecompiledHeaderOutputFile>
+    </ClCompile>
     <ClCompile Include="..\..\src\render\direct3d12\SDL_shaders_d3d12.c" />
     <ClCompile Include="..\..\src\render\direct3d\SDL_render_d3d.c" />
     <ClCompile Include="..\..\src\render\direct3d11\SDL_render_d3d11.c" />
