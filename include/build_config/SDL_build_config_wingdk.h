@@ -206,6 +206,7 @@
 #define SDL_VIDEO_RENDER_D3D11 1
 #endif
 #define SDL_VIDEO_RENDER_D3D12 1
+#define SDL_VIDEO_DCOMP 1
 
 /* Enable OpenGL support */
 #define SDL_VIDEO_OPENGL 1
