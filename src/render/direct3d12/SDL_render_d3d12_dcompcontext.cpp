@@ -2,6 +2,8 @@
 
 #ifdef SDL_VIDEO_RENDER_D3D12
 
+#error "This file should not compile!"
+
 // OS headers
 #include <dcomp.h>
 #include <Windows.h>
