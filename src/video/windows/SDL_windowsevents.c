@@ -28,6 +28,7 @@
 #include "../../events/scancodes_windows.h"
 #include "../../main/SDL_main_callbacks.h"
 #include "../../core/windows/SDL_hid.h"
+#include "render/direct3d12/SDL_render_d3d12_dcompcontext.h"
 
 // Dropfile support
 #include <shellapi.h>
@@ -1900,8 +1901,14 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                 params->rgrc[0].right = params->rgrc[0].left + w;
                 params->rgrc[0].bottom = params->rgrc[0].top + h;
             }
-            //return 0;
         }
+
+		// We are processing the window resizing here to avoid flicker.
+		// It should be done here, not in WM_SIZING or WM_WINDOWPOSCHANGING,
+		// because this is where the window frame is calculated and as soon
+		// as the contents are drawn on a SwapChain, we can (and have to)
+		// update them BEFORE the window is actually resized and its frame
+		// is drawn on the screen.
 
 		// Use the result of DefWindowProc's WM_NCCALCSIZE handler to get the upcoming client rect.
 		// Technically, when wparam is TRUE, lparam points to NCCALCSIZE_PARAMS, but its first
@@ -1909,8 +1916,8 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		DefWindowProc(hwnd, msg, wParam, lParam);
 		RECT *rect = (RECT *) lParam;
 		if (rect->right > rect->left && rect->bottom > rect->top) {
-			/*data->width*/ data->window->resizing_w = rect->right - rect->left;
-			/*data->height*/ data->window->resizing_h = rect->bottom - rect->top;
+			data->window->resizing_w = rect->right - rect->left;
+			data->window->resizing_h = rect->bottom - rect->top;
 			data->window->is_resizing = true;
 
 			SDL_Renderer* renderer = SDL_GetRenderer(data->window);
@@ -1922,6 +1929,16 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		// We're never preserving the client area, so we always return 0.
 		return 0;
     } break;
+
+	case WM_DESTROY:
+	{
+		// Destroy the DirectComposition context properly,
+		// so that the window fades away beautifully.
+		if (data->dcompContext != NULL) {
+			DestroyDCompContext(data->dcompContext);
+			data->dcompContext = NULL;
+		}
+	} break;
 
     case WM_NCHITTEST:
     {

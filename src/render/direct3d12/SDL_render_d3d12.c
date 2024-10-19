@@ -260,7 +260,6 @@ typedef struct
 
 	IDXGIAdapter* intelAdapter;
 	IDXGIOutput* intelAdapterFirstOutput;
-	void* dcompContext;
 } D3D12_RenderData;
 
 // Define D3D GUIDs here so we don't have to include uuid.lib.
@@ -380,7 +379,7 @@ static void D3D12_DestroyTexture(SDL_Renderer *renderer, SDL_Texture *texture);
 
 static void D3D12_ReleaseAll(SDL_Renderer *renderer)
 {
-    D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
+	D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
     SDL_Texture *texture = NULL;
 
     SDL_PropertiesID props = SDL_GetRendererProperties(renderer);
@@ -400,7 +399,7 @@ static void D3D12_ReleaseAll(SDL_Renderer *renderer)
         D3D_SAFE_RELEASE(data->dxgiFactory);
         D3D_SAFE_RELEASE(data->dxgiAdapter);
         D3D_SAFE_RELEASE(data->swapChain);
-		DestroyDCompContext(data->dcompContext);
+		//DestroyDCompContext(data->dcompContext);
 
 		D3D_SAFE_RELEASE(data->intelAdapterFirstOutput);
 		D3D_SAFE_RELEASE(data->intelAdapter);
@@ -1302,7 +1301,8 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
     }
 
-	data->dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
+	SDL_WindowData* winData = renderer->window->internal;
+	winData->dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
 
 	/* Ensure that the swapchain does not queue more than one frame at a time. This both reduces latency
 	 * and ensures that the application will only render after each VSync, minimizing power consumption.
@@ -1504,8 +1504,10 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 
 #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (data->swapChain) {
-		printf("rb w: %d, h: %d\n", w, h); fflush(stdout);
         // If the swap chain already exists, resize it.
+		// Here we are allocating buffer bigger than we need to guarantee
+		// that even if a flicker occurs, at least the background
+		// will have a proper color
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                           0,
 						  (UINT)(w * 1.5), (UINT)(h * 1.5),
