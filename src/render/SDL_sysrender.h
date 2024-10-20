@@ -199,6 +199,7 @@ struct SDL_Renderer
                          float scale_x, float scale_y);
 
     void (*InvalidateCachedState)(SDL_Renderer *renderer);
+	long (*UpdateForWindowSizeChange)(SDL_Renderer *renderer);
     bool (*RunCommandQueue)(SDL_Renderer *renderer, SDL_RenderCommand *cmd, void *vertices, size_t vertsize);
     bool (*UpdateTexture)(SDL_Renderer *renderer, SDL_Texture *texture,
                          const SDL_Rect *rect, const void *pixels,
