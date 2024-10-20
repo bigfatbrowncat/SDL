@@ -131,7 +131,7 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;vcruntimed.lib;msvcrtd.lib;ucrtd.lib;msvcprtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;vcruntimed.lib;msvcrtd.lib;ucrtd.lib;msvcprtd.lib;dcomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
@@ -159,7 +159,7 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_xs.lib;uuid.lib;vcruntimed.lib;msvcrtd.lib;ucrtd.lib;msvcprtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_xs.lib;uuid.lib;vcruntimed.lib;msvcrtd.lib;ucrtd.lib;msvcprtd.lib;dcomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
@@ -194,7 +194,7 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_x.lib;uuid.lib;vcruntimed.lib;msvcrtd.lib;ucrtd.lib;msvcprtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_x.lib;uuid.lib;vcruntimed.lib;msvcrtd.lib;ucrtd.lib;msvcprtd.lib;dcomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
@@ -230,7 +230,7 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;vcruntime.lib;msvcrt.lib;ucrt.lib;msvcprt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;vcruntime.lib;msvcrt.lib;ucrt.lib;msvcprt.lib;dcomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -259,7 +259,7 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_xs.lib;uuid.lib;vcruntime.lib;msvcrt.lib;ucrt.lib;msvcprt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_xs.lib;uuid.lib;vcruntime.lib;msvcrt.lib;ucrt.lib;msvcprt.lib;dcomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -295,7 +295,7 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_x.lib;uuid.lib;vcruntime.lib;msvcrt.lib;ucrt.lib;msvcprt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>setupapi.lib;winmm.lib;imm32.lib;version.lib;xgameruntime.lib;d3d12_x.lib;uuid.lib;vcruntime.lib;msvcrt.lib;ucrt.lib;msvcprt.lib;dcomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -461,6 +461,8 @@
     <ClInclude Include="..\..\src\render\direct3d11\SDL_shaders_d3d11.h" />
     <ClInclude Include="..\..\src\render\direct3d12\SDL_render_d3d12_xbox.h" />
     <ClInclude Include="..\..\src\render\direct3d12\SDL_shaders_d3d12.h" />
+    <ClInclude Include="..\..\src\render\SDL_render_dcompcontext.h" />
+    <ClInclude Include="..\..\src\render\SDL_hacks_gpu.h" />
     <ClInclude Include="..\..\src\render\direct3d\SDL_shaders_d3d.h" />
     <ClInclude Include="..\..\src\render\opengles2\SDL_gles2funcs.h" />
     <ClInclude Include="..\..\src\render\opengles2\SDL_shaders_gles2.h" />
@@ -767,6 +769,11 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.Scarlett.x64'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Xbox.XboxOne.x64'">CompileAsCpp</CompileAs>
     </ClCompile>
+    <ClCompile Include="..\..\src\render\SDL_render_dcompcontext.cpp">
+      <PrecompiledHeaderOutputFile Condition="'$(Configuration)|$(Platform)'=='Debug|Gaming.Desktop.x64'">$(IntDir)$(TargetName)_cpp.pch</PrecompiledHeaderOutputFile>
+      <PrecompiledHeaderOutputFile Condition="'$(Configuration)|$(Platform)'=='Release|Gaming.Desktop.x64'">$(IntDir)$(TargetName)_cpp.pch</PrecompiledHeaderOutputFile>
+    </ClCompile>
+    <ClCompile Include="..\..\src\render\SDL_hacks_gpu.c" />
     <ClCompile Include="..\..\src\render\direct3d12\SDL_shaders_d3d12.c" />
     <ClCompile Include="..\..\src\render\direct3d\SDL_render_d3d.c" />
     <ClCompile Include="..\..\src\render\direct3d11\SDL_render_d3d11.c" />
