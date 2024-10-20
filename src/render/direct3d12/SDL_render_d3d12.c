@@ -33,6 +33,8 @@
 #include "../SDL_d3dmath.h"
 #include "../../video/directx/SDL_d3d12.h"
 
+#include "../SDL_render_dcompcontext.h"
+
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
 #include "SDL_render_d3d12_xbox.h"
 #endif
@@ -52,6 +54,7 @@ extern "C" {
 
 // This must be included here as the function definitions in SDL_pixels.c/_c.h are C, not C++
 #include "../../video/SDL_pixels_c.h"
+#include "../SDL_hacks_gpu.h"
 
 /* !!! FIXME: vertex buffer bandwidth could be lower; only use UV coords when
    !!! FIXME:  textures are needed. */
@@ -254,6 +257,9 @@ typedef struct
     Float4X4 identity;
     int currentVertexBuffer;
     bool issueBatch;
+#ifdef SDL_VIDEO_DCOMP
+    IDXGIOutput* dxgiAdapterFirstOutput;
+#endif
 } D3D12_RenderData;
 
 // Define D3D GUIDs here so we don't have to include uuid.lib.
@@ -393,6 +399,9 @@ static void D3D12_ReleaseAll(SDL_Renderer *renderer)
         D3D_SAFE_RELEASE(data->dxgiFactory);
         D3D_SAFE_RELEASE(data->dxgiAdapter);
         D3D_SAFE_RELEASE(data->swapChain);
+#ifdef SDL_VIDEO_DCOMP
+        D3D_SAFE_RELEASE(data->dxgiAdapterFirstOutput);
+#endif
 #endif
         D3D_SAFE_RELEASE(data->d3dDevice);
         D3D_SAFE_RELEASE(data->debugInterface);
@@ -1242,11 +1251,14 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = 2; // Use double-buffering to minimize latency.
+#ifndef SDL_VIDEO_DCOMP
+    // DXGI_SCALING_NONE doesn't work with DirectComposition
     if (WIN_IsWindows8OrGreater()) {
         swapChainDesc.Scaling = DXGI_SCALING_NONE;
     } else {
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
     }
+#endif
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;               // All Windows Store apps must use this SwapEffect.
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | // To support SetMaximumFrameLatency
                           DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;                  // To support presenting with allow tearing on
@@ -1258,6 +1270,17 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
     }
 
+#ifdef SDL_VIDEO_DCOMP
+    result = IDXGIFactory2_CreateSwapChainForComposition(data->dxgiFactory,
+                      (IUnknown *)data->commandQueue,
+                      &swapChainDesc,
+                      NULL, // Allow on all displays.
+                      &swapChain);
+    if (FAILED(result)) {
+        WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForComposition"), result);
+        goto done;
+    }
+#else
     result = IDXGIFactory2_CreateSwapChainForHwnd(data->dxgiFactory,
                       (IUnknown *)data->commandQueue,
                       hwnd,
@@ -1269,6 +1292,7 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForHwnd"), result);
         goto done;
     }
+#endif
 
     IDXGIFactory6_MakeWindowAssociation(data->dxgiFactory, hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
 
@@ -1277,6 +1301,11 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGISwapChain1::QueryInterface"), result);
         goto done;
     }
+
+#ifdef SDL_VIDEO_DCOMP
+    SDL_WindowData* winData = renderer->window->internal;
+    winData->dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
+#endif
 
     /* Ensure that the swapchain does not queue more than one frame at a time. This both reduces latency
      * and ensures that the application will only render after each VSync, minimizing power consumption.
@@ -1357,9 +1386,25 @@ D3D12_HandleDeviceLost(SDL_Renderer *renderer)
     return S_OK;
 }
 
+#ifdef SDL_VIDEO_DCOMP
+static bool D3D12_LookForFirstOutput(SDL_Renderer *renderer) {
+    D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
+    return HACK_FindFirstAdapterOutput((IDXGIAdapter*)data->dxgiAdapter, &data->dxgiAdapterFirstOutput);
+}
+
+static bool D3D12_SyncFirstOutput(SDL_Renderer *renderer, bool freeOutput) {
+    D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
+    return HACK_SyncFirstAdapterOutput( &data->dxgiAdapterFirstOutput, freeOutput);
+}
+#endif
+
 // Initialize all resources that change when the window's size changes.
 static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 {
+#ifdef SDL_VIDEO_DCOMP
+    D3D12_LookForFirstOutput(renderer);
+#endif
+
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
     HRESULT result = S_OK;
     int i, w, h;
@@ -1390,9 +1435,12 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (data->swapChain) {
         // If the swap chain already exists, resize it.
+        // Here we are allocating buffer quarter bigger than the window size to guarantee
+        // that even in the worst case, if a flicker occurs, at least the background
+        // will have a proper color
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                           0,
-                          w, h,
+                          (UINT)(w * 1.25), (UINT)(h * 1.25),
                           DXGI_FORMAT_UNKNOWN,
                           data->swapFlags);
         if (result == DXGI_ERROR_DEVICE_REMOVED) {
@@ -2953,6 +3001,13 @@ static bool D3D12_RunCommandQueue(SDL_Renderer *renderer, SDL_RenderCommand *cmd
         cmd = cmd->next;
     }
 
+#ifdef SDL_VIDEO_DCOMP
+    // If we are resizing the buffer, we need to synchronize with the
+    // iGPU driver after running the queue. That would minimize the flicker possibility for
+    // the quickly rendered window contents
+    D3D12_SyncFirstOutput(renderer, false);
+#endif
+
     return true;
 }
 
@@ -3116,7 +3171,13 @@ static bool D3D12_RenderPresent(SDL_Renderer *renderer)
 
     // Issue the command list
     result = ID3D12GraphicsCommandList2_Close(data->commandList);
+
     ID3D12CommandQueue_ExecuteCommandLists(data->commandQueue, 1, (ID3D12CommandList *const *)&data->commandList);
+#ifdef SDL_VIDEO_DCOMP
+    // After executing the queue, synchronizing again.
+    // That is necessary for the slowly rendered contents
+    D3D12_SyncFirstOutput(renderer, true);
+#endif
 
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
     result = D3D12_XBOX_PresentFrame(data->commandQueue, data->frameToken, data->renderTargets[data->currentBackBufferIndex]);
@@ -3201,9 +3262,9 @@ bool D3D12_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Proper
     }
 
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_TRANSPARENT) {
-		// D3D12 removed the swap effect needed to support transparent windows, use D3D11 instead
-		return SDL_SetError("The direct3d12 renderer doesn't work with transparent windows");
-	}
+        // D3D12 removed the swap effect needed to support transparent windows, use D3D11 instead
+        return SDL_SetError("The direct3d12 renderer doesn't work with transparent windows");
+    }
 
     SDL_SetupRendererColorspace(renderer, create_props);
 
@@ -3238,6 +3299,7 @@ bool D3D12_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Proper
     renderer->QueueDrawLines = D3D12_QueueDrawPoints; // lines and points queue vertices the same way.
     renderer->QueueGeometry = D3D12_QueueGeometry;
     renderer->InvalidateCachedState = D3D12_InvalidateCachedState;
+    renderer->UpdateForWindowSizeChange = D3D12_UpdateForWindowSizeChange;
     renderer->RunCommandQueue = D3D12_RunCommandQueue;
     renderer->RenderReadPixels = D3D12_RenderReadPixels;
     renderer->RenderPresent = D3D12_RenderPresent;

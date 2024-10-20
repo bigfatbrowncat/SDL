@@ -29,6 +29,8 @@
 #include "../SDL_sysvideo.h"
 #endif
 
+typedef struct DCompContext DCompContext;
+
 // Set up for C function definitions, even when using C++
 #ifdef __cplusplus
 extern "C" {
@@ -100,6 +102,9 @@ struct SDL_WindowData
     // Whether we retain the content of the window when changing state
     UINT copybits_flag;
     SDLDropTarget *drop_target;
+
+    DCompContext* dcompContext;
+    bool is_resizing;
 };
 
 extern bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props);

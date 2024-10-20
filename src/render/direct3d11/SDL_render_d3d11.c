@@ -33,7 +33,11 @@
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
 
+#include "../SDL_render_dcompcontext.h"
+
 #include "SDL_shaders_d3d11.h"
+
+#include "../SDL_hacks_gpu.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #define SDL_COMPOSE_ERROR(str) __FUNCTION__ ", " str
@@ -202,6 +206,9 @@ typedef struct
     bool viewportDirty;
     Float4X4 identity;
     int currentVertexBuffer;
+#ifdef SDL_VIDEO_DCOMP
+    IDXGIOutput* dxgiAdapterFirstOutput;
+#endif
 } D3D11_RenderData;
 
 // Define D3D GUIDs here so we don't have to include uuid.lib.
@@ -352,6 +359,9 @@ static void D3D11_ReleaseAll(SDL_Renderer *renderer)
         SAFE_RELEASE(data->inputLayout);
         SAFE_RELEASE(data->mainRenderTargetView);
         SAFE_RELEASE(data->swapChain);
+#ifdef SDL_VIDEO_DCOMP
+        SAFE_RELEASE(data->dxgiAdapterFirstOutput);
+#endif
 
         SAFE_RELEASE(data->d3dContext);
         SAFE_RELEASE(data->d3dDevice);
@@ -885,11 +895,14 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = 2; // Use double-buffering to minimize latency.
+#ifndef SDL_VIDEO_DCOMP
+    // DXGI_SCALING_NONE doesn't work with DirectComposition
     if (WIN_IsWindows8OrGreater()) {
         swapChainDesc.Scaling = DXGI_SCALING_NONE;
     } else {
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
     }
+#endif
     if (SDL_GetWindowFlags(renderer->window) & SDL_WINDOW_TRANSPARENT) {
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
@@ -918,6 +931,17 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
             goto done;
         }
 
+#ifdef SDL_VIDEO_DCOMP
+        result = IDXGIFactory2_CreateSwapChainForComposition(data->dxgiFactory,
+                                                             (IUnknown *)data->d3dDevice,
+                                                             &swapChainDesc,
+                                                             NULL, // Allow on all displays.
+                                                             &data->swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForComposition"), result);
+            goto done;
+        }
+#else
         result = IDXGIFactory2_CreateSwapChainForHwnd(data->dxgiFactory,
                                                       (IUnknown *)data->d3dDevice,
                                                       hwnd,
@@ -929,12 +953,20 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
             WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForHwnd"), result);
             goto done;
         }
+#endif
 
         IDXGIFactory_MakeWindowAssociation(data->dxgiFactory, hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
+
+#ifdef SDL_VIDEO_DCOMP
+        SDL_WindowData* winData = renderer->window->internal;
+        winData->dcompContext = CreateDCompContextFor(hwnd, (IDXGISwapChain3*)data->swapChain);
+#endif
+
 #else
         SDL_SetError(__FUNCTION__ ", Unable to find something to attach a swap chain to");
         goto done;
 #endif // defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_WINGDK) / else
+
     }
     data->swapEffect = swapChainDesc.SwapEffect;
 
@@ -1013,9 +1045,25 @@ static HRESULT D3D11_HandleDeviceLost(SDL_Renderer *renderer)
     return S_OK;
 }
 
+#ifdef SDL_VIDEO_DCOMP
+static bool D3D11_LookForFirstOutput(SDL_Renderer *renderer) {
+    D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
+    return HACK_FindFirstAdapterOutput((IDXGIAdapter*)data->dxgiAdapter, &data->dxgiAdapterFirstOutput);
+}
+
+static bool D3D11_SyncFirstOutput(SDL_Renderer *renderer, bool freeOutput) {
+    D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
+    return HACK_SyncFirstAdapterOutput( &data->dxgiAdapterFirstOutput, freeOutput);
+}
+#endif
+
 // Initialize all resources that change when the window's size changes.
 static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 {
+#ifdef SDL_VIDEO_DCOMP
+    D3D11_LookForFirstOutput(renderer);
+#endif
+
     D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
     ID3D11Texture2D *backBuffer = NULL;
     HRESULT result = S_OK;
@@ -1038,9 +1086,12 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 
     if (data->swapChain) {
         // If the swap chain already exists, resize it.
+        // Here we are allocating buffer quarter bigger than the window size to guarantee
+        // that even in the worst case, if a flicker occurs, at least the background
+        // will have a proper color
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                                               0,
-                                              w, h,
+                                              (UINT)(w * 1.25), (UINT)(h * 1.25),
                                               DXGI_FORMAT_UNKNOWN,
                                               0);
         if (result == DXGI_ERROR_DEVICE_REMOVED) {
@@ -2512,6 +2563,13 @@ static bool D3D11_RunCommandQueue(SDL_Renderer *renderer, SDL_RenderCommand *cmd
         cmd = cmd->next;
     }
 
+#ifdef SDL_VIDEO_DCOMP
+    // If we are resizing the buffer, we need to synchronize with the
+    // iGPU driver after running the queue. That would minimize the flicker possibility for
+    // the quickly rendered window contents
+    D3D11_SyncFirstOutput(renderer, false);
+#endif
+
     return true;
 }
 
@@ -2615,6 +2673,12 @@ static bool D3D11_RenderPresent(SDL_Renderer *renderer)
 
     SDL_zero(parameters);
 
+#ifdef SDL_VIDEO_DCOMP
+    // After executing the queue, synchronizing again.
+    // That is necessary for the slowly rendered contents
+    D3D11_SyncFirstOutput(renderer, true);
+#endif
+
     /* The application may optionally specify "dirty" or "scroll"
      * rects to improve efficiency in certain scenarios.
      */
@@ -2706,6 +2770,7 @@ static bool D3D11_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL
     renderer->QueueDrawLines = D3D11_QueueDrawPoints; // lines and points queue vertices the same way.
     renderer->QueueGeometry = D3D11_QueueGeometry;
     renderer->InvalidateCachedState = D3D11_InvalidateCachedState;
+    renderer->UpdateForWindowSizeChange = D3D11_UpdateForWindowSizeChange;
     renderer->RunCommandQueue = D3D11_RunCommandQueue;
     renderer->RenderReadPixels = D3D11_RenderReadPixels;
     renderer->RenderPresent = D3D11_RenderPresent;

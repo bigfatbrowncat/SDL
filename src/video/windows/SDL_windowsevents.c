@@ -28,6 +28,7 @@
 #include "../../events/scancodes_windows.h"
 #include "../../main/SDL_main_callbacks.h"
 #include "../../core/windows/SDL_hid.h"
+#include "../../render/SDL_render_dcompcontext.h"
 
 // Dropfile support
 #include <shellapi.h>
@@ -1034,6 +1035,8 @@ static bool SkipAltGrLeftControl(WPARAM wParam, LPARAM lParam)
     return false;
 }
 
+void UpdateRendererForWindowSizeChange(SDL_Renderer *renderer);
+
 LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     SDL_WindowData *data;
@@ -1515,12 +1518,20 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_MOVED, x, y);
         }
 
-        // Moving the window from one display to another can change the size of the window (in the handling of SDL_EVENT_WINDOW_MOVED), so we need to re-query the bounds
-        if (GetClientRect(hwnd, &rect) && !WIN_IsRectEmpty(&rect)) {
-            w = rect.right;
-            h = rect.bottom;
+        // If we aren't resizing the window, we are calling the redrawing here.
+        // If we are resizing, it's too late to call here, we have already called it in WM_NCCALCSIZE instead
+        if (!data->is_resizing) {
+            // Moving the window from one display to another can change the size of the window (in the handling of SDL_EVENT_WINDOW_MOVED), so we need to re-query the bounds
+            if (GetClientRect(hwnd, &rect) && !WIN_IsRectEmpty(&rect)) {
+                w = rect.right;
+                h = rect.bottom;
 
-            SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, w, h);
+                SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, w, h);
+            }
+        } else {
+            // This flag was set in the WM_NCCALCSIZE to avoid double painting
+            // Now we are clearing it
+            data->is_resizing = false;
         }
 
         WIN_UpdateClipCursor(data->window);
@@ -1897,8 +1908,45 @@ LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                 params->rgrc[0].right = params->rgrc[0].left + w;
                 params->rgrc[0].bottom = params->rgrc[0].top + h;
             }
-            return 0;
         }
+
+        // We are processing the window resizing here to avoid flicker.
+        // It should be done here, not in WM_SIZING or WM_WINDOWPOSCHANGING,
+        // because this is where the window frame is calculated and as soon
+        // as the contents are drawn on a SwapChain, we can (and have to)
+        // update them BEFORE the window is actually resized and its frame
+        // is drawn on the screen.
+
+        // Use the result of DefWindowProc's WM_NCCALCSIZE handler to get the upcoming client rect.
+        // Technically, when wparam is TRUE, lparam points to NCCALCSIZE_PARAMS, but its first
+        // member is a RECT with the same meaning as the one lparam points to when wparam is FALSE.
+        DefWindowProc(hwnd, msg, wParam, lParam);
+        RECT *rect = (RECT *) lParam;
+        if (rect->right > rect->left && rect->bottom > rect->top) {
+            int updated_w = rect->right - rect->left;
+            int updated_h = rect->bottom - rect->top;
+            data->is_resizing = true;
+
+            SDL_Renderer* renderer = SDL_GetRenderer(data->window);
+            if (renderer != NULL) {
+                UpdateRendererForWindowSizeChange(renderer);
+            }
+            SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, updated_w, updated_h);
+        }
+        // We're never preserving the client area, so we always return 0.
+        return 0;
+    } break;
+
+    case WM_DESTROY:
+    {
+#ifdef SDL_VIDEO_DCOMP
+        // Destroy the DirectComposition context properly,
+        // so that the window fades away beautifully.
+        if (data->dcompContext != NULL) {
+            DestroyDCompContext(data->dcompContext);
+            data->dcompContext = NULL;
+        }
+#endif // SDL_VIDEO_DCOMP
     } break;
 
     case WM_NCHITTEST:

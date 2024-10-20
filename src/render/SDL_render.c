@@ -306,6 +306,13 @@ static SDL_INLINE void DebugLogRenderCommands(const SDL_RenderCommand *cmd)
 #endif
 }
 
+void UpdateRendererForWindowSizeChange(SDL_Renderer *renderer)
+{
+    if (renderer->UpdateForWindowSizeChange) {
+        renderer->UpdateForWindowSizeChange(renderer);
+    }
+}
+
 static bool FlushRenderCommands(SDL_Renderer *renderer)
 {
     bool result;
