@@ -203,6 +203,7 @@ typedef Uint64 SDL_WindowFlags;
 #define SDL_WINDOW_METAL                SDL_UINT64_C(0x0000000020000000)    /**< window usable for Metal view */
 #define SDL_WINDOW_TRANSPARENT          SDL_UINT64_C(0x0000000040000000)    /**< window with transparent buffer */
 #define SDL_WINDOW_NOT_FOCUSABLE        SDL_UINT64_C(0x0000000080000000)    /**< window should not be focusable */
+#define SDL_WINDOW_DCOMP		        SDL_UINT64_C(0x0000000100000000)    /**< window uses DirectComposition API */
 
 
 /**

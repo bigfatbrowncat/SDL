@@ -703,7 +703,12 @@ bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properties
         styleEx |= GetWindowStyleEx(window);
 
 #ifdef SDL_VIDEO_DCOMP
-        //styleEx |= WS_EX_COMPOSITED; //WS_EX_NOREDIRECTIONBITMAP;
+		if (window->flags & SDL_WINDOW_DCOMP) {
+			// This style is necessary for the DirectComposition.
+			// It disables all the "legacy" window drawing and reduces
+			// flickering and image doubing on window resize
+			styleEx |= WS_EX_NOREDIRECTIONBITMAP;
+		}
 #endif
 
         // Figure out what the window area will be
@@ -715,6 +720,39 @@ bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properties
         if (!hwnd) {
             return WIN_SetError("Couldn't create window");
         }
+
+		//SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_NOREDIRECTIONBITMAP);
+
+//		HINSTANCE hInstance = GetModuleHandle(NULL);
+//
+//		WNDCLASSEX windowClass;
+//
+//		windowClass.cbSize = sizeof(WNDCLASSEX);
+//		windowClass.hInstance = hInstance;
+//		windowClass.lpfnWndProc = DefWindowProc;
+//		windowClass.lpszClassName = L"dcomp_window";
+//		windowClass.style = CS_HREDRAW | CS_VREDRAW;
+//		windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+//		windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+//		windowClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+//		windowClass.hIconSm = LoadIcon(NULL, IDI_WINLOGO);
+//		windowClass.cbClsExtra = 0;
+//		windowClass.cbWndExtra = 0;
+//		windowClass.lpszMenuName = NULL;
+//
+//		if (!RegisterClassEx(&windowClass)){
+//			return false;
+//		}
+//
+//		HWND client_hwnd = CreateWindowEx(0,
+//									 windowClass.lpszClassName,
+//									 (LPCTSTR)NULL,
+//									 WS_CHILD | WS_VISIBLE,
+//									 0, 0, 300, 200,
+//									 hwnd,
+//									 NULL,
+//									 hInstance,
+//									 NULL);
 
         WIN_UpdateDarkModeForHWND(hwnd);
 

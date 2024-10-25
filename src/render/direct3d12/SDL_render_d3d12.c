@@ -3256,7 +3256,16 @@ bool D3D12_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Proper
 {
     D3D12_RenderData *data;
 
-    HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+#ifdef SDL_VIDEO_DCOMP
+	SDL_WindowFlags window_flags = SDL_GetWindowFlags(window);
+	if (!(window_flags & SDL_WINDOW_DCOMP)) {
+		if (!SDL_RecreateWindow(window, window_flags | SDL_WINDOW_DCOMP)) {
+			return false;
+		}
+	}
+#endif
+
+	HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
     if (!hwnd) {
         return SDL_SetError("Couldn't get window handle");
     }
