@@ -703,7 +703,7 @@ bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properties
         styleEx |= GetWindowStyleEx(window);
 
 #ifdef SDL_VIDEO_DCOMP
-        styleEx |= WS_EX_NOREDIRECTIONBITMAP;
+        //styleEx |= WS_EX_COMPOSITED; //WS_EX_NOREDIRECTIONBITMAP;
 #endif
 
         // Figure out what the window area will be

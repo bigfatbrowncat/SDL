@@ -258,8 +258,7 @@ typedef struct
     int currentVertexBuffer;
     bool issueBatch;
 #ifdef SDL_VIDEO_DCOMP
-    IDXGIAdapter* intelAdapter;
-    IDXGIOutput* intelAdapterFirstOutput;
+    IDXGIOutput* dxgiAdapterFirstOutput;
 #endif
 } D3D12_RenderData;
 
@@ -401,8 +400,7 @@ static void D3D12_ReleaseAll(SDL_Renderer *renderer)
         D3D_SAFE_RELEASE(data->dxgiAdapter);
         D3D_SAFE_RELEASE(data->swapChain);
 #ifdef SDL_VIDEO_DCOMP
-        D3D_SAFE_RELEASE(data->intelAdapterFirstOutput);
-        D3D_SAFE_RELEASE(data->intelAdapter);
+        D3D_SAFE_RELEASE(data->dxgiAdapterFirstOutput);
 #endif
 #endif
         D3D_SAFE_RELEASE(data->d3dDevice);
@@ -1389,14 +1387,14 @@ D3D12_HandleDeviceLost(SDL_Renderer *renderer)
 }
 
 #ifdef SDL_VIDEO_DCOMP
-static bool D3D12_LookForIntelOutput(SDL_Renderer *renderer) {
+static bool D3D12_LookForFirstOutput(SDL_Renderer *renderer) {
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
-    return HACK_LookForIntelOutput((IDXGIFactory2*)data->dxgiFactory, &data->intelAdapter, &data->intelAdapterFirstOutput);
+    return HACK_FindFirstAdapterOutput((IDXGIAdapter*)data->dxgiAdapter, &data->dxgiAdapterFirstOutput);
 }
 
-static bool D3D12_SyncIntelOutputIfPrepared(SDL_Renderer *renderer, bool freeOutput) {
+static bool D3D12_SyncFirstOutput(SDL_Renderer *renderer, bool freeOutput) {
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
-    return HACK_SyncIntelOutputIfPrepared( &data->intelAdapterFirstOutput, freeOutput);
+    return HACK_SyncFirstAdapterOutput( &data->dxgiAdapterFirstOutput, freeOutput);
 }
 #endif
 
@@ -1404,7 +1402,7 @@ static bool D3D12_SyncIntelOutputIfPrepared(SDL_Renderer *renderer, bool freeOut
 static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 {
 #ifdef SDL_VIDEO_DCOMP
-    D3D12_LookForIntelOutput(renderer);
+    D3D12_LookForFirstOutput(renderer);
 #endif
 
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
@@ -3007,7 +3005,7 @@ static bool D3D12_RunCommandQueue(SDL_Renderer *renderer, SDL_RenderCommand *cmd
     // If we are resizing the buffer, we need to synchronize with the
     // iGPU driver after running the queue. That would minimize the flicker possibility for
     // the quickly rendered window contents
-    D3D12_SyncIntelOutputIfPrepared(renderer, false);
+    D3D12_SyncFirstOutput(renderer, false);
 #endif
 
     return true;
@@ -3178,7 +3176,7 @@ static bool D3D12_RenderPresent(SDL_Renderer *renderer)
 #ifdef SDL_VIDEO_DCOMP
     // After executing the queue, synchronizing again.
     // That is necessary for the slowly rendered contents
-    D3D12_SyncIntelOutputIfPrepared(renderer, true);
+    D3D12_SyncFirstOutput(renderer, true);
 #endif
 
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)

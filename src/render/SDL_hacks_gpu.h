@@ -34,13 +34,13 @@ extern "C" {
 
 #include <dxgi1_6.h>
 
-bool HACK_LookForIntelOutput(IDXGIFactory2* dxgiFactory, IDXGIAdapter** intelAdapter, IDXGIOutput** intelAdapterFirstOutput);
+bool HACK_FindFirstAdapterOutput(IDXGIAdapter* dxgiAdapter, IDXGIOutput** dxgiAdapterFirstOutput);
 
 /*
   The function waits for VBlank on a passed adapter and frees it if freeOutput is true
   Returns true if the passed (*intelAdapterFirstOutput) is not NULL
  */
-bool HACK_SyncIntelOutputIfPrepared(IDXGIOutput** intelAdapterFirstOutput, bool freeOutput);
+bool HACK_SyncFirstAdapterOutput(IDXGIOutput** dxgiAdapterFirstOutput, bool freeOutput);
 
 #ifdef __cplusplus
 }

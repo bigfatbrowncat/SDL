@@ -38,45 +38,20 @@
         X = NULL;                \
     }
 
-bool HACK_LookForIntelOutput(IDXGIFactory2* dxgiFactory, IDXGIAdapter** intelAdapter, IDXGIOutput** intelAdapterFirstOutput) {
-    //D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
-
-    // Intel iGPU driver is sometimes buggy in terms of frame synchronization,
-    // specifically, it doesn't process swapChain->Present() well after the buffer
-    // was just resized -- a flicker occurs. So we have to do a trick:
-
-    // 1. Finding the Intel iGPU in the system
-    if (*intelAdapter == NULL) {
-
-        const UINT INTEL_VENDOR_ID = 0x8086;
-        IDXGIAdapter* adapter;
-        for (UINT i = 0; dxgiFactory->lpVtbl->EnumAdapters(dxgiFactory, i, &adapter) != DXGI_ERROR_NOT_FOUND; i++) {
-            DXGI_ADAPTER_DESC desc;
-
-            HRESULT res = adapter->lpVtbl->GetDesc(adapter, &desc);
-            if (res != S_OK) { return false; }
-
-            if (desc.VendorId == INTEL_VENDOR_ID) {
-                *intelAdapter = adapter;
-                break;
-            }
-        }
-    }
-
-    // 2. Finding the FIRST output of the adapter that has a display connected.
-    //    It has been found experimentally, we need the first adapter output from the list.
-    // (the next step is in the D3D12_SyncIntelOutput() function)
-    if (*intelAdapter != NULL) {
+// Finding the FIRST output of the adapter.
+// It has been found experimentally, we need the first adapter output from the list.
+bool HACK_FindFirstAdapterOutput(IDXGIAdapter* dxgiAdapter, IDXGIOutput** dxgiAdapterFirstOutput) {
+    if (dxgiAdapter != NULL) {
         IDXGIOutput* output;
-        for (UINT i = 0; (*intelAdapter)->lpVtbl->EnumOutputs(*intelAdapter, i, &output) != DXGI_ERROR_NOT_FOUND; i++) {
+        for (UINT i = 0; dxgiAdapter->lpVtbl->EnumOutputs(dxgiAdapter, i, &output) != DXGI_ERROR_NOT_FOUND; i++) {
             DXGI_OUTPUT_DESC outputDesc;
             HRESULT result = output->lpVtbl->GetDesc(output, &outputDesc);
             if (FAILED(result)) {
-                return WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("HACK_LookForIntelOutput"), result);
+                return WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("HACK_FindFirstAdapterOutput"), result);
             }
 
             if (outputDesc.Monitor != NULL) {
-                *intelAdapterFirstOutput = output;
+                *dxgiAdapterFirstOutput = output;
                 break;
             } else {
                 output->lpVtbl->Release(output);
@@ -86,18 +61,17 @@ bool HACK_LookForIntelOutput(IDXGIFactory2* dxgiFactory, IDXGIAdapter** intelAda
     return true;
 }
 
-bool HACK_SyncIntelOutputIfPrepared(IDXGIOutput** intelAdapterFirstOutput, bool freeOutput) {
-    // (the previous steps are in the D3D12_LookForIntelOutput() function)
-    // 3. Before doing the swapChain->Present(), waiting for the VBlank on the previously
-    //    found first iGPU output. That almostly (99%) guarantees that there wouldn't be
-    //    a flicker after window resizing.
-    if (*intelAdapterFirstOutput != NULL) {
-        HRESULT result = (*intelAdapterFirstOutput)->lpVtbl->WaitForVBlank(*intelAdapterFirstOutput);
+bool HACK_SyncFirstAdapterOutput(IDXGIOutput** dxgiAdapterFirstOutput, bool freeOutput) {
+    // Before doing the swapChain->Present(), waiting for the VBlank on the previously
+    // found first GPU output. That almostly (99%) guarantees that there wouldn't be
+    // a flicker after window resizing.
+    if (*dxgiAdapterFirstOutput != NULL) {
+        HRESULT result = (*dxgiAdapterFirstOutput)->lpVtbl->WaitForVBlank(*dxgiAdapterFirstOutput);
         if (FAILED(result)) {
-            return WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("HACK_SyncIntelOutput"), result);
+            return WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("HACK_SyncFirstAdapterOutput"), result);
         }
         if (freeOutput) {
-            DCOMP_SAFE_RELEASE(*intelAdapterFirstOutput); // Resetting the found adapter before the next resize
+            DCOMP_SAFE_RELEASE(*dxgiAdapterFirstOutput); // Resetting the found adapter before the next resize
         }
         return true;
     }
